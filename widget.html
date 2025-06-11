@@ -34,17 +34,30 @@
       </div>
     </div>
   </div>
+  <!-- Runtime configuration allows the webhook URL to be changed without
+       modifying widget.js -->
+  <script src="config.js"></script>
+  <!-- Main widget script -->
   <script src="widget.js"></script>
   <script>
+    // Initialize using values from ListingPilotConfig defined in config.js
     RealtorWidget.init({
       containerId: "realtor-widget-container",
-      chatEndpoint: "http://3.143.23.149:5001/chat",
-      historyEndpoint: "http://3.143.23.149:5001/chat/history",
-      branding: { 
-        logo: "https://i.ibb.co/fV7Z2NVT/Logo-removebg-modified.png",
-        themeColor: "#2c3e50" 
+      chatEndpoint: window.ListingPilotConfig.webhookUrl,
+      // Optionally use branding fields from ListingPilotConfig
+      branding: {
+        logo: window.ListingPilotConfig.logoUrl || "https://i.ibb.co/fV7Z2NVT/Logo-removebg-modified.png",
+        themeColor: window.ListingPilotConfig.primaryColor || "#2c3e50",
+        agentName: window.ListingPilotConfig.agentName
       }
     });
   </script>
+  <!-- Example when loading widget.js from a CDN:
+  <script>
+    window.ListingPilotConfig = { webhookUrl: "https://YOUR_DOMAIN/webhook/chat" };
+  </script>
+  <script src="https://cdn.example.com/listingpilot-widget.js"></script>
+  -->
+  <!-- Ensure your webhook endpoint allows CORS requests from the page hosting the widget -->
 </body>
 </html>
