@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Realtor Chat Widget</title>
+  <link rel="stylesheet" href="widget.css">
+  <!-- Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div id="realtor-widget-wrapper">
+    <div id="realtor-widget-container">
+      <!-- Hidden checkbox for toggling the widget -->
+      <input type="checkbox" id="widget-toggle" style="display: none;">
+      <!-- Header acts as a label for the checkbox -->
+      <label for="widget-toggle" class="widget-header">
+        <img class="widget-logo" src="https://i.ibb.co/fV7Z2NVT/Logo-removebg-modified.png" alt="Logo">
+        <span class="widget-title">Realtor Assistant</span>
+      </label>
+      <!-- This wrapper holds the content and footer -->
+      <div class="widget-body">
+        <div class="widget-content">
+          <div id="chat-container" class="widget-chat-container"></div>
+          <p class="widget-instructions">
+            Welcome to Realtor Assistant! Ask me about property listings, market trends, or finding your next home. Simply type your question below to get started.
+          </p>
+        </div>
+        <div class="widget-footer">
+          <form id="chat-form">
+            <input type="text" id="chat-input" placeholder="Type your message..." autocomplete="off" autocorrect="off" spellcheck="false">
+            <button type="submit">Send</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="widget.js"></script>
+  <script>
+    RealtorWidget.init({
+      containerId: "realtor-widget-container",
+      chatEndpoint: "http://3.143.23.149:5001/chat",
+      historyEndpoint: "http://3.143.23.149:5001/chat/history",
+      branding: { 
+        logo: "https://i.ibb.co/fV7Z2NVT/Logo-removebg-modified.png",
+        themeColor: "#2c3e50" 
+      }
+    });
+  </script>
+</body>
+</html>
