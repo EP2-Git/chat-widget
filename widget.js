@@ -94,6 +94,80 @@ const RealtorWidget = (() => {
     if (chatContainer) chatContainer.scrollTop = chatContainer.scrollHeight;
   }
 
+  // Display a list of property listings in the chat.
+  function displayListings(listings) {
+    const chatContainer = document.getElementById('chat-container');
+    const listingsContainer = createElement('div', { class: 'listings-container' });
+
+    listings.forEach(listing => {
+      const formatted = {
+        Price: listing.Price || 'Price not available',
+        Beds: listing.Beds || 'N/A',
+        Baths: listing.Baths || 'N/A',
+        Sqft: listing.Sqft || 'N/A',
+        Description: listing.Description || '',
+        URL: listing.URL || '#'
+      };
+
+      const card = createElement('div', { class: 'listing-card' });
+      card.innerHTML = `
+        <div class="listing-title">${formatted.Price}</div>
+        <div class="listing-detail">Beds: ${formatted.Beds}</div>
+        <div class="listing-detail">Baths: ${formatted.Baths}</div>
+        <div class="listing-detail">Size: ${formatted.Sqft}</div>
+        ${formatted.Description ? `<div class="listing-description">${formatted.Description}</div>` : ''}
+        <a href="${formatted.URL}" class="listing-link" target="_blank">View Property</a>
+      `;
+      listingsContainer.appendChild(card);
+    });
+
+    chatContainer.appendChild(listingsContainer);
+  }
+
+  // Placeholder for showing available booking slots.
+  function showBookingOptions(slots) {
+    console.log('Show booking options', slots);
+    // TODO: implement UI for slots
+  }
+
+  // Placeholder for showing booking confirmation details.
+  function showBookingConfirmation(info) {
+    console.log('Show booking confirmation', info);
+    // TODO: implement UI for booking confirmation
+  }
+
+  // Process API responses in a backend-agnostic way.
+  // This decouples the widget from any specific response schema so
+  // the n8n workflow can drive UI behavior via "action" and "data".
+  function processApiResponse(apiResponse, chatContainer) {
+    if (!chatContainer) return;
+
+    if (apiResponse.error) {
+      const errorEl = createElement('div', { class: 'widget-message assistant error' }, apiResponse.error);
+      chatContainer.appendChild(errorEl);
+      scrollChatToBottom(chatContainer);
+      return;
+    }
+
+    const replyText = apiResponse.replyText || apiResponse.response || apiResponse.message || '';
+    if (replyText) {
+      const messageEl = createElement('div', { class: 'widget-message assistant' }, replyText);
+      chatContainer.appendChild(messageEl);
+    }
+
+    const action = apiResponse.action;
+    const data = apiResponse.data || {};
+    if (action === 'showSlots' && Array.isArray(data.slots)) {
+      showBookingOptions(data.slots);
+    } else if (action === 'bookingConfirmed' && data.bookingInfo) {
+      showBookingConfirmation(data.bookingInfo);
+    } else if (action === 'showListings' && Array.isArray(data.listings)) {
+      displayListings(data.listings);
+    }
+
+    scrollChatToBottom(chatContainer);
+  }
+
   // Send user message to API.
   async function sendMessageToAPI(message) {
     const webhookUrl = getWebhookUrl();
@@ -159,81 +233,11 @@ const RealtorWidget = (() => {
       
       const apiResponse = await sendMessageToAPI(userMsg);
       tempMsgEl.remove();
-      
-      let responseContent = apiResponse.response;
-      let structured;
-      
-      // Enhanced response parsing
-      try {
-          // Handle string responses by attempting to parse them
-          if (typeof responseContent === 'string') {
-              structured = JSON.parse(responseContent);
-          } else if (typeof responseContent === 'object') {
-              structured = responseContent;
-          } else {
-              throw new Error('Invalid response format');
-          }
 
-          // Ensure the response has the expected structure
-          structured = {
-              messages: Array.isArray(structured.messages) ? structured.messages : 
-                       [structured.message || 'No message provided'],
-              listings: Array.isArray(structured.listings) ? structured.listings : []
-          };
-
-          // Display sequential messages
-          for (const message of structured.messages) {
-              const messageEl = createElement('div', { 
-                  class: 'widget-message assistant'
-              }, message);
-              chatContainer.appendChild(messageEl);
-              scrollChatToBottom(chatContainer);
-
-              // Add a small delay between messages for better readability
-              await new Promise(resolve => setTimeout(resolve, 500));
-          }
-
-          // Display listings if available
-          if (structured.listings.length > 0) {
-              const listingsContainer = createElement('div', { class: 'listings-container' });
-              
-              structured.listings.forEach(listing => {
-                  // Ensure all listing properties exist and are formatted
-                  const formattedListing = {
-                      Price: listing.Price || 'Price not available',
-                      Beds: listing.Beds || 'N/A',
-                      Baths: listing.Baths || 'N/A',
-                      Sqft: listing.Sqft || 'N/A',
-                      Description: listing.Description || '',
-                      URL: listing.URL || '#'
-                  };
-
-                  const listingCard = createElement('div', { class: 'listing-card' });
-                  listingCard.innerHTML = `
-                      <div class="listing-title">${formattedListing.Price}</div>
-                      <div class="listing-detail">Beds: ${formattedListing.Beds}</div>
-                      <div class="listing-detail">Baths: ${formattedListing.Baths}</div>
-                      <div class="listing-detail">Size: ${formattedListing.Sqft}</div>
-                      ${formattedListing.Description ? 
-                          `<div class="listing-description">${formattedListing.Description}</div>` : 
-                          ''}
-                      <a href="${formattedListing.URL}" class="listing-link" target="_blank">View Property</a>
-                  `;
-                  listingsContainer.appendChild(listingCard);
-              });
-              
-              chatContainer.appendChild(listingsContainer);
-          }
-
-      } catch (error) {
-          console.error('Error processing response:', error);
-          const errorMsg = createElement('div', { 
-              class: 'widget-message assistant error'
-          }, "I apologize, but I encountered an error processing the response. Please try again.");
-          chatContainer.appendChild(errorMsg);
-      }
-      
-      scrollChatToBottom(chatContainer);
+      // Generic response handler driven by the n8n workflow.
+      // The backend now returns a common JSON shape so we delegate
+      // UI behavior based on optional "action" and "data" fields.
+      processApiResponse(apiResponse, chatContainer);
     });
   }
 
