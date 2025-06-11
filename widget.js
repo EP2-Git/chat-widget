@@ -11,6 +11,46 @@ const RealtorWidget = (() => {
     }
   };
 
+  // In-memory fallback if localStorage isn't available (e.g. private browsing)
+  let memoryConversationId = null;
+
+  // Generate a UUID v4-style
+  function generateUUID() {
+    if (window.crypto && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    // Fallback for older browsers
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  }
+
+  // Retrieve or create a persistent conversation ID. Persisting the ID allows
+  // the webhook backend to maintain state across messages, enabling multi-turn
+  // conversational flows.
+  function getConversationId() {
+    const key = 'ListingPilotConversationId';
+    try {
+      if (window.localStorage) {
+        let id = localStorage.getItem(key);
+        if (!id) {
+          id = generateUUID();
+          localStorage.setItem(key, id);
+        }
+        return id;
+      }
+    } catch (err) {
+      console.warn('localStorage unavailable, using in-memory ID');
+    }
+
+    // If localStorage is not accessible (e.g. private mode), use memory only
+    // for this page session
+    if (!memoryConversationId) memoryConversationId = generateUUID();
+    return memoryConversationId;
+  }
+
   // Utility: Create element with attributes and optional text.
   function createElement(tag, attrs = {}, textContent = '') {
     const el = document.createElement(tag);
@@ -37,7 +77,11 @@ const RealtorWidget = (() => {
       const response = await fetch(config.chatEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message })
+        body: JSON.stringify({
+          conversationId: getConversationId(),
+          message,
+          pageUrl: window.location.href
+        })
       });
       if (!response.ok) throw new Error(`HTTP error ${response.status}`);
       return await response.json();
