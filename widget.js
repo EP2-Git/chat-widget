@@ -191,6 +191,47 @@ const RealtorWidget = (() => {
       return { error: err.message };
     }
   }
+  // Render a series of listing cards under the bot message.
+  // listings: [{ title, imageUrl, price, detailsUrl }]
+  function displayListings(listings, chatContainer) {
+    const container = createElement("div", { class: "listings-container" });
+    listings.forEach(listing => {
+      const card = createElement("div", { class: "listing-card" });
+      card.innerHTML = `
+        <img src="${listing.imageUrl}" alt="${listing.title}" class="listing-image">
+        <div class="listing-info">
+          <div class="listing-title">${listing.title}</div>
+          <div class="listing-price">${listing.price}</div>
+          <a href="${listing.detailsUrl}" target="_blank" class="listing-link">View details</a>
+        </div>`;
+      container.appendChild(card);
+    });
+    chatContainer.appendChild(container);
+  }
+
+
+  // Process API response (Prompt 3)
+  async function processApiResponse(apiResponse, chatContainer) {
+    let content = apiResponse.data || apiResponse.response;
+    let structured = {};
+    try {
+      structured = typeof content === "string" ? JSON.parse(content) : (content || {});
+    } catch (e) {
+      console.error("Failed to parse API response", e);
+      structured = {};
+    }
+    const messages = Array.isArray(structured.messages) ? structured.messages : [structured.message || structured.text || ""];
+    for (const message of messages) {
+      const el = createElement("div", { class: "widget-message assistant" }, message);
+      chatContainer.appendChild(el);
+      scrollChatToBottom(chatContainer);
+      await new Promise(r => setTimeout(r, 500));
+    }
+    if (structured.action === "showListings" && Array.isArray(structured.listings)) {
+      // Use helper to show multiple listings returned by the n8n workflow
+      displayListings(structured.listings, chatContainer);
+    }
+  }
 
   // Initialize chat functionality.
   async function init(options = {}) {
@@ -234,10 +275,9 @@ const RealtorWidget = (() => {
       const apiResponse = await sendMessageToAPI(userMsg);
       tempMsgEl.remove();
 
-      // Generic response handler driven by the n8n workflow.
-      // The backend now returns a common JSON shape so we delegate
-      // UI behavior based on optional "action" and "data" fields.
-      processApiResponse(apiResponse, chatContainer);
+      await processApiResponse(apiResponse, chatContainer);
+      scrollChatToBottom(chatContainer);
+      
     });
   }
 
