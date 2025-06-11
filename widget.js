@@ -3,8 +3,9 @@
 const RealtorWidget = (() => {
   let config = {
     containerId: 'realtor-widget-container',
-    chatEndpoint: 'http://3.143.23.149:5001/chat',
-    historyEndpoint: 'http://3.143.23.149:5001/chat/history',
+    // webhookUrl is not defined here. It must be provided at runtime via
+    // `window.ListingPilotConfig.webhookUrl` so deployments don't need to edit
+    // this file to point to their own API endpoint.
     branding: {
       logo: 'https://i.ibb.co/fV7Z2NVT/Logo-removebg-modified.png',
       themeColor: '#2c3e50'
@@ -26,6 +27,28 @@ const RealtorWidget = (() => {
     return el;
   }
 
+  // Retrieve the webhook URL from the global ListingPilotConfig object. This
+  // allows deployments to provide their own endpoint without modifying the
+  // widget source. If the value is missing or looks like a placeholder, a
+  // configuration error is displayed and `null` is returned.
+  function getWebhookUrl() {
+    const url = window?.ListingPilotConfig?.webhookUrl;
+    if (url && typeof url === 'string' && !/REPLACE_ME|YOUR_WEBHOOK_URL/i.test(url)) {
+      return url;
+    }
+    console.error('ListingPilot webhook URL not configured.');
+    const chatContainer = document.getElementById('chat-container');
+    if (chatContainer && !document.querySelector('.widget-config-error')) {
+      const errEl = createElement(
+        'div',
+        { class: 'widget-message assistant error widget-config-error' },
+        'Chat widget not configured. Please set window.ListingPilotConfig.webhookUrl.'
+      );
+      chatContainer.appendChild(errEl);
+    }
+    return null;
+  }
+
   // Scroll chat container to bottom.
   function scrollChatToBottom(chatContainer) {
     if (chatContainer) chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -33,8 +56,12 @@ const RealtorWidget = (() => {
 
   // Send user message to API.
   async function sendMessageToAPI(message) {
+    const webhookUrl = getWebhookUrl();
+    if (!webhookUrl) {
+      return { error: 'Webhook URL not configured' };
+    }
     try {
-      const response = await fetch(config.chatEndpoint, {
+      const response = await fetch(webhookUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message })
@@ -55,6 +82,9 @@ const RealtorWidget = (() => {
       console.error(`Container with id ${config.containerId} not found.`);
       return;
     }
+    // Check webhook configuration on init so misconfiguration is visible even
+    // before a message is sent.
+    getWebhookUrl();
     // Chat container, form, and input are assumed to be present in the HTML.
     const chatContainer = document.getElementById('chat-container');
     const form = document.getElementById('chat-form');

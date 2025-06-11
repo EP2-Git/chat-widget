@@ -34,15 +34,17 @@
       </div>
     </div>
   </div>
+  <!-- Define ListingPilotConfig before loading the widget so it can read the
+       webhook URL at runtime. Example:
+       &lt;script&gt;window.ListingPilotConfig = { webhookUrl: "https://example.com/chat" };&lt;/script&gt; -->
   <script src="widget.js"></script>
   <script>
     RealtorWidget.init({
       containerId: "realtor-widget-container",
-      chatEndpoint: "http://3.143.23.149:5001/chat",
-      historyEndpoint: "http://3.143.23.149:5001/chat/history",
-      branding: { 
+      // webhookUrl is read from window.ListingPilotConfig; no endpoints here.
+      branding: {
         logo: "https://i.ibb.co/fV7Z2NVT/Logo-removebg-modified.png",
-        themeColor: "#2c3e50" 
+        themeColor: "#2c3e50"
       }
     });
   </script>
