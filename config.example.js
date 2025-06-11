@@ -1,16 +1,13 @@
-/*
- * Configuration template for ListingPilot chat widget.
- * Copy this file to `config.js` and replace the placeholder values
- * with your real webhook URL and any branding options. The widget
- * reads these values at runtime so URLs don't need to be hardcoded
- * in your build.
- */
-window.ListingPilotConfig = {
-  // URL of your n8n webhook that processes chat messages.
-  webhookUrl: "https://YOUR_N8N_INSTANCE_DOMAIN/webhook/chat",
 
   // Optional settings for branding the widget interface.
   // agentName: "Your Name",
   // primaryColor: "#0A1F44",
   // logoUrl: "https://example.com/logo.png"
+
+window.ListingPilotConfig = {
+  webhookUrl: "https://example.com/webhook",
+  agentName: "Realtor Assistant",
+  primaryColor: "#2c3e50",
+  accentColor: "#16a085",
+  historyEndpoint: "https://example.com/history" // optional
 };

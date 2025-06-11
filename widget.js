@@ -3,13 +3,54 @@
 const RealtorWidget = (() => {
   let config = {
     containerId: 'realtor-widget-container',
-    chatEndpoint: 'http://3.143.23.149:5001/chat',
-    historyEndpoint: 'http://3.143.23.149:5001/chat/history',
+    // webhookUrl is not defined here. It must be provided at runtime via
+    // `window.ListingPilotConfig.webhookUrl` so deployments don't need to edit
+    // this file to point to their own API endpoint.
     branding: {
       logo: 'https://i.ibb.co/fV7Z2NVT/Logo-removebg-modified.png',
       themeColor: '#2c3e50'
     }
   };
+
+  // In-memory fallback if localStorage isn't available (e.g. private browsing)
+  let memoryConversationId = null;
+
+  // Generate a UUID v4-style
+  function generateUUID() {
+    if (window.crypto && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    // Fallback for older browsers
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  }
+
+  // Retrieve or create a persistent conversation ID. Persisting the ID allows
+  // the webhook backend to maintain state across messages, enabling multi-turn
+  // conversational flows.
+  function getConversationId() {
+    const key = 'ListingPilotConversationId';
+    try {
+      if (window.localStorage) {
+        let id = localStorage.getItem(key);
+        if (!id) {
+          id = generateUUID();
+          localStorage.setItem(key, id);
+        }
+        return id;
+      }
+    } catch (err) {
+      console.warn('localStorage unavailable, using in-memory ID');
+    }
+
+    // If localStorage is not accessible (e.g. private mode), use memory only
+    // for this page session
+    if (!memoryConversationId) memoryConversationId = generateUUID();
+    return memoryConversationId;
+  }
 
   // Utility: Create element with attributes and optional text.
   function createElement(tag, attrs = {}, textContent = '') {
@@ -26,18 +67,122 @@ const RealtorWidget = (() => {
     return el;
   }
 
+  // Retrieve the webhook URL from the global ListingPilotConfig object. This
+  // allows deployments to provide their own endpoint without modifying the
+  // widget source. If the value is missing or looks like a placeholder, a
+  // configuration error is displayed and `null` is returned.
+  function getWebhookUrl() {
+    const url = window?.ListingPilotConfig?.webhookUrl;
+    if (url && typeof url === 'string' && !/REPLACE_ME|YOUR_WEBHOOK_URL/i.test(url)) {
+      return url;
+    }
+    console.error('ListingPilot webhook URL not configured.');
+    const chatContainer = document.getElementById('chat-container');
+    if (chatContainer && !document.querySelector('.widget-config-error')) {
+      const errEl = createElement(
+        'div',
+        { class: 'widget-message assistant error widget-config-error' },
+        'Chat widget not configured. Please set window.ListingPilotConfig.webhookUrl.'
+      );
+      chatContainer.appendChild(errEl);
+    }
+    return null;
+  }
+
   // Scroll chat container to bottom.
   function scrollChatToBottom(chatContainer) {
     if (chatContainer) chatContainer.scrollTop = chatContainer.scrollHeight;
   }
 
+  // Display a list of property listings in the chat.
+  function displayListings(listings) {
+    const chatContainer = document.getElementById('chat-container');
+    const listingsContainer = createElement('div', { class: 'listings-container' });
+
+    listings.forEach(listing => {
+      const formatted = {
+        Price: listing.Price || 'Price not available',
+        Beds: listing.Beds || 'N/A',
+        Baths: listing.Baths || 'N/A',
+        Sqft: listing.Sqft || 'N/A',
+        Description: listing.Description || '',
+        URL: listing.URL || '#'
+      };
+
+      const card = createElement('div', { class: 'listing-card' });
+      card.innerHTML = `
+        <div class="listing-title">${formatted.Price}</div>
+        <div class="listing-detail">Beds: ${formatted.Beds}</div>
+        <div class="listing-detail">Baths: ${formatted.Baths}</div>
+        <div class="listing-detail">Size: ${formatted.Sqft}</div>
+        ${formatted.Description ? `<div class="listing-description">${formatted.Description}</div>` : ''}
+        <a href="${formatted.URL}" class="listing-link" target="_blank">View Property</a>
+      `;
+      listingsContainer.appendChild(card);
+    });
+
+    chatContainer.appendChild(listingsContainer);
+  }
+
+  // Placeholder for showing available booking slots.
+  function showBookingOptions(slots) {
+    console.log('Show booking options', slots);
+    // TODO: implement UI for slots
+  }
+
+  // Placeholder for showing booking confirmation details.
+  function showBookingConfirmation(info) {
+    console.log('Show booking confirmation', info);
+    // TODO: implement UI for booking confirmation
+  }
+
+  // Process API responses in a backend-agnostic way.
+  // This decouples the widget from any specific response schema so
+  // the n8n workflow can drive UI behavior via "action" and "data".
+  function processApiResponse(apiResponse, chatContainer) {
+    if (!chatContainer) return;
+
+    if (apiResponse.error) {
+      const errorEl = createElement('div', { class: 'widget-message assistant error' }, apiResponse.error);
+      chatContainer.appendChild(errorEl);
+      scrollChatToBottom(chatContainer);
+      return;
+    }
+
+    const replyText = apiResponse.replyText || apiResponse.response || apiResponse.message || '';
+    if (replyText) {
+      const messageEl = createElement('div', { class: 'widget-message assistant' }, replyText);
+      chatContainer.appendChild(messageEl);
+    }
+
+    const action = apiResponse.action;
+    const data = apiResponse.data || {};
+    if (action === 'showSlots' && Array.isArray(data.slots)) {
+      showBookingOptions(data.slots);
+    } else if (action === 'bookingConfirmed' && data.bookingInfo) {
+      showBookingConfirmation(data.bookingInfo);
+    } else if (action === 'showListings' && Array.isArray(data.listings)) {
+      displayListings(data.listings);
+    }
+
+    scrollChatToBottom(chatContainer);
+  }
+
   // Send user message to API.
   async function sendMessageToAPI(message) {
+    const webhookUrl = getWebhookUrl();
+    if (!webhookUrl) {
+      return { error: 'Webhook URL not configured' };
+    }
     try {
-      const response = await fetch(config.chatEndpoint, {
+      const response = await fetch(webhookUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message })
+        body: JSON.stringify({
+          conversationId: getConversationId(),
+          message,
+          pageUrl: window.location.href
+        })
       });
       if (!response.ok) throw new Error(`HTTP error ${response.status}`);
       return await response.json();
@@ -55,6 +200,9 @@ const RealtorWidget = (() => {
       console.error(`Container with id ${config.containerId} not found.`);
       return;
     }
+    // Check webhook configuration on init so misconfiguration is visible even
+    // before a message is sent.
+    getWebhookUrl();
     // Chat container, form, and input are assumed to be present in the HTML.
     const chatContainer = document.getElementById('chat-container');
     const form = document.getElementById('chat-form');
@@ -85,81 +233,11 @@ const RealtorWidget = (() => {
       
       const apiResponse = await sendMessageToAPI(userMsg);
       tempMsgEl.remove();
-      
-      let responseContent = apiResponse.response;
-      let structured;
-      
-      // Enhanced response parsing
-      try {
-          // Handle string responses by attempting to parse them
-          if (typeof responseContent === 'string') {
-              structured = JSON.parse(responseContent);
-          } else if (typeof responseContent === 'object') {
-              structured = responseContent;
-          } else {
-              throw new Error('Invalid response format');
-          }
 
-          // Ensure the response has the expected structure
-          structured = {
-              messages: Array.isArray(structured.messages) ? structured.messages : 
-                       [structured.message || 'No message provided'],
-              listings: Array.isArray(structured.listings) ? structured.listings : []
-          };
-
-          // Display sequential messages
-          for (const message of structured.messages) {
-              const messageEl = createElement('div', { 
-                  class: 'widget-message assistant'
-              }, message);
-              chatContainer.appendChild(messageEl);
-              scrollChatToBottom(chatContainer);
-
-              // Add a small delay between messages for better readability
-              await new Promise(resolve => setTimeout(resolve, 500));
-          }
-
-          // Display listings if available
-          if (structured.listings.length > 0) {
-              const listingsContainer = createElement('div', { class: 'listings-container' });
-              
-              structured.listings.forEach(listing => {
-                  // Ensure all listing properties exist and are formatted
-                  const formattedListing = {
-                      Price: listing.Price || 'Price not available',
-                      Beds: listing.Beds || 'N/A',
-                      Baths: listing.Baths || 'N/A',
-                      Sqft: listing.Sqft || 'N/A',
-                      Description: listing.Description || '',
-                      URL: listing.URL || '#'
-                  };
-
-                  const listingCard = createElement('div', { class: 'listing-card' });
-                  listingCard.innerHTML = `
-                      <div class="listing-title">${formattedListing.Price}</div>
-                      <div class="listing-detail">Beds: ${formattedListing.Beds}</div>
-                      <div class="listing-detail">Baths: ${formattedListing.Baths}</div>
-                      <div class="listing-detail">Size: ${formattedListing.Sqft}</div>
-                      ${formattedListing.Description ? 
-                          `<div class="listing-description">${formattedListing.Description}</div>` : 
-                          ''}
-                      <a href="${formattedListing.URL}" class="listing-link" target="_blank">View Property</a>
-                  `;
-                  listingsContainer.appendChild(listingCard);
-              });
-              
-              chatContainer.appendChild(listingsContainer);
-          }
-
-      } catch (error) {
-          console.error('Error processing response:', error);
-          const errorMsg = createElement('div', { 
-              class: 'widget-message assistant error'
-          }, "I apologize, but I encountered an error processing the response. Please try again.");
-          chatContainer.appendChild(errorMsg);
-      }
-      
-      scrollChatToBottom(chatContainer);
+      // Generic response handler driven by the n8n workflow.
+      // The backend now returns a common JSON shape so we delegate
+      // UI behavior based on optional "action" and "data" fields.
+      processApiResponse(apiResponse, chatContainer);
     });
   }
 
