@@ -1,10 +1,10 @@
-# ListingPilot Chat Widget
+# Chat Widget
 
 Embeddable JavaScript widget for realtor demos that sends chat messages to your own webhook service.
 
 ## Motivation
 
-Realtors often want to showcase conversational AI or automated assistants on property websites. This project provides a simple drop‑in widget that can display chat messages and listing cards while delegating all conversation logic to your own webhook.
+This project provides a simple drop‑in widget that can display chat messages and listing cards while delegating all conversation logic to your own webhook.
 
 ## Features
 
