@@ -46,6 +46,47 @@ const RealtorWidget = (() => {
       return { error: err.message };
     }
   }
+  // Render a series of listing cards under the bot message.
+  // listings: [{ title, imageUrl, price, detailsUrl }]
+  function displayListings(listings, chatContainer) {
+    const container = createElement("div", { class: "listings-container" });
+    listings.forEach(listing => {
+      const card = createElement("div", { class: "listing-card" });
+      card.innerHTML = `
+        <img src="${listing.imageUrl}" alt="${listing.title}" class="listing-image">
+        <div class="listing-info">
+          <div class="listing-title">${listing.title}</div>
+          <div class="listing-price">${listing.price}</div>
+          <a href="${listing.detailsUrl}" target="_blank" class="listing-link">View details</a>
+        </div>`;
+      container.appendChild(card);
+    });
+    chatContainer.appendChild(container);
+  }
+
+
+  // Process API response (Prompt 3)
+  async function processApiResponse(apiResponse, chatContainer) {
+    let content = apiResponse.data || apiResponse.response;
+    let structured = {};
+    try {
+      structured = typeof content === "string" ? JSON.parse(content) : (content || {});
+    } catch (e) {
+      console.error("Failed to parse API response", e);
+      structured = {};
+    }
+    const messages = Array.isArray(structured.messages) ? structured.messages : [structured.message || structured.text || ""];
+    for (const message of messages) {
+      const el = createElement("div", { class: "widget-message assistant" }, message);
+      chatContainer.appendChild(el);
+      scrollChatToBottom(chatContainer);
+      await new Promise(r => setTimeout(r, 500));
+    }
+    if (structured.action === "showListings" && Array.isArray(structured.listings)) {
+      // Use helper to show multiple listings returned by the n8n workflow
+      displayListings(structured.listings, chatContainer);
+    }
+  }
 
   // Initialize chat functionality.
   async function init(options = {}) {
@@ -85,81 +126,9 @@ const RealtorWidget = (() => {
       
       const apiResponse = await sendMessageToAPI(userMsg);
       tempMsgEl.remove();
-      
-      let responseContent = apiResponse.response;
-      let structured;
-      
-      // Enhanced response parsing
-      try {
-          // Handle string responses by attempting to parse them
-          if (typeof responseContent === 'string') {
-              structured = JSON.parse(responseContent);
-          } else if (typeof responseContent === 'object') {
-              structured = responseContent;
-          } else {
-              throw new Error('Invalid response format');
-          }
-
-          // Ensure the response has the expected structure
-          structured = {
-              messages: Array.isArray(structured.messages) ? structured.messages : 
-                       [structured.message || 'No message provided'],
-              listings: Array.isArray(structured.listings) ? structured.listings : []
-          };
-
-          // Display sequential messages
-          for (const message of structured.messages) {
-              const messageEl = createElement('div', { 
-                  class: 'widget-message assistant'
-              }, message);
-              chatContainer.appendChild(messageEl);
-              scrollChatToBottom(chatContainer);
-
-              // Add a small delay between messages for better readability
-              await new Promise(resolve => setTimeout(resolve, 500));
-          }
-
-          // Display listings if available
-          if (structured.listings.length > 0) {
-              const listingsContainer = createElement('div', { class: 'listings-container' });
-              
-              structured.listings.forEach(listing => {
-                  // Ensure all listing properties exist and are formatted
-                  const formattedListing = {
-                      Price: listing.Price || 'Price not available',
-                      Beds: listing.Beds || 'N/A',
-                      Baths: listing.Baths || 'N/A',
-                      Sqft: listing.Sqft || 'N/A',
-                      Description: listing.Description || '',
-                      URL: listing.URL || '#'
-                  };
-
-                  const listingCard = createElement('div', { class: 'listing-card' });
-                  listingCard.innerHTML = `
-                      <div class="listing-title">${formattedListing.Price}</div>
-                      <div class="listing-detail">Beds: ${formattedListing.Beds}</div>
-                      <div class="listing-detail">Baths: ${formattedListing.Baths}</div>
-                      <div class="listing-detail">Size: ${formattedListing.Sqft}</div>
-                      ${formattedListing.Description ? 
-                          `<div class="listing-description">${formattedListing.Description}</div>` : 
-                          ''}
-                      <a href="${formattedListing.URL}" class="listing-link" target="_blank">View Property</a>
-                  `;
-                  listingsContainer.appendChild(listingCard);
-              });
-              
-              chatContainer.appendChild(listingsContainer);
-          }
-
-      } catch (error) {
-          console.error('Error processing response:', error);
-          const errorMsg = createElement('div', { 
-              class: 'widget-message assistant error'
-          }, "I apologize, but I encountered an error processing the response. Please try again.");
-          chatContainer.appendChild(errorMsg);
-      }
-      
+      await processApiResponse(apiResponse, chatContainer);
       scrollChatToBottom(chatContainer);
+      
     });
   }
 

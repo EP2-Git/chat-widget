@@ -294,6 +294,9 @@ body, #realtor-widget-container, #realtor-widget-container * {
 
 /* Listing card styling */
 .listing-card {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
   border: 1px solid var(--border-color);
   padding: 12px 16px;
   margin-bottom: 15px;
@@ -308,6 +311,16 @@ body, #realtor-widget-container, #realtor-widget-container * {
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
+.listing-image {
+  width: 80px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.listing-info {
+  flex: 1;
+}
 /* Listing detail styling */
 .listing-detail {
   margin-bottom: 6px;
@@ -344,6 +357,9 @@ body, #realtor-widget-container, #realtor-widget-container * {
 
 /* Responsive adjustments for mobile */
 @media (max-width: 480px) {
+  .listing-card {
+    flex-direction: column;
+  }
   #realtor-widget-container {
     width: 90vw;
     height: 500px !important;
