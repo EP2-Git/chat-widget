@@ -44,6 +44,7 @@ const RealtorWidget = (() => {
       } catch (err) {
         // ignore storage errors in testing mode
       }
+
       if (!memoryConversationId) memoryConversationId = generateUUID();
       return memoryConversationId;
     }
@@ -109,35 +110,6 @@ const RealtorWidget = (() => {
     if (chatContainer) chatContainer.scrollTop = chatContainer.scrollHeight;
   }
 
-  // Display a list of property listings in the chat.
-  function displayListings(listings) {
-    const chatContainer = document.getElementById('chat-container');
-    const listingsContainer = createElement('div', { class: 'listings-container' });
-
-    listings.forEach(listing => {
-      const formatted = {
-        Price: listing.Price || 'Price not available',
-        Beds: listing.Beds || 'N/A',
-        Baths: listing.Baths || 'N/A',
-        Sqft: listing.Sqft || 'N/A',
-        Description: listing.Description || '',
-        URL: listing.URL || '#'
-      };
-
-      const card = createElement('div', { class: 'listing-card' });
-      card.innerHTML = `
-        <div class="listing-title">${formatted.Price}</div>
-        <div class="listing-detail">Beds: ${formatted.Beds}</div>
-        <div class="listing-detail">Baths: ${formatted.Baths}</div>
-        <div class="listing-detail">Size: ${formatted.Sqft}</div>
-        ${formatted.Description ? `<div class="listing-description">${formatted.Description}</div>` : ''}
-        <a href="${formatted.URL}" class="listing-link" target="_blank">View Property</a>
-      `;
-      listingsContainer.appendChild(card);
-    });
-
-    chatContainer.appendChild(listingsContainer);
-  }
 
   // Placeholder for showing available booking slots.
   function showBookingOptions(slots) {
@@ -151,61 +123,56 @@ const RealtorWidget = (() => {
     // TODO: implement UI for booking confirmation
   }
 
-  // Process API responses in a backend-agnostic way.
-  // This decouples the widget from any specific response schema so
-  // the n8n workflow can drive UI behavior via "action" and "data".
-  function processApiResponse(apiResponse, chatContainer) {
-    if (!chatContainer) return;
 
-    if (apiResponse.error) {
-      const errorEl = createElement('div', { class: 'widget-message assistant error' }, apiResponse.error);
-      chatContainer.appendChild(errorEl);
-      scrollChatToBottom(chatContainer);
-      return;
-    }
-
-    const replyText = apiResponse.replyText || apiResponse.response || apiResponse.message || '';
-    if (replyText) {
-      const messageEl = createElement('div', { class: 'widget-message assistant' }, replyText);
-      chatContainer.appendChild(messageEl);
-    }
-
-    const action = apiResponse.action;
-    const data = apiResponse.data || {};
-    if (action === 'showSlots' && Array.isArray(data.slots)) {
-      showBookingOptions(data.slots);
-    } else if (action === 'bookingConfirmed' && data.bookingInfo) {
-      showBookingConfirmation(data.bookingInfo);
-    } else if (action === 'showListings' && Array.isArray(data.listings)) {
-      displayListings(data.listings);
-    }
-
-    scrollChatToBottom(chatContainer);
-  }
-
-  // Send user message to API.
   async function sendMessageToAPI(message) {
-    const webhookUrl = getWebhookUrl();
-    if (!webhookUrl) {
-      return { error: 'Webhook URL not configured' };
-    }
-    try {
-      const response = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          conversationId: getConversationId(),
-          message,
-          pageUrl: window.location.href
-        })
-      });
-      if (!response.ok) throw new Error(`HTTP error ${response.status}`);
-      return await response.json();
-    } catch (err) {
-      console.error('Error sending message:', err);
-      return { error: err.message };
-    }
+  const webhookUrl = getWebhookUrl();
+  console.log("[Widget] sendMessageToAPI called with message:", message);
+  console.log("[Widget] Retrieved webhookUrl:", webhookUrl);
+  if (!webhookUrl) {
+    console.warn("[Widget] No webhook URL configured, returning error.");
+    return { error: 'Webhook URL not configured' };
   }
+  try {
+    const payload = {
+      conversationId: getConversationId(),
+      message,
+      pageUrl: window.location.href
+    };
+    console.log("[Widget] Sending payload:", payload);
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    console.log("[Widget] Fetch completed, status:", response.status, response.statusText);
+    // Read raw text first to log it
+    const text = await response.text();
+    console.log("[Widget] Raw response text:", text);
+    if (!response.ok) {
+      // If status not OK, log and return error
+      console.warn(`[Widget] Non-OK HTTP status: ${response.status}`);
+      // Optionally try parse JSON even on non-OK, but here:
+      return { error: `HTTP error ${response.status}` };
+    }
+    if (!text) {
+      console.warn("[Widget] Empty response body");
+      return { error: "Empty response from server" };
+    }
+    let data;
+    try {
+      data = JSON.parse(text);
+      console.log("[Widget] Parsed JSON response:", data);
+    } catch (parseErr) {
+      console.error("[Widget] JSON parse error:", parseErr, "Response text:", text);
+      return { error: "Invalid JSON response" };
+    }
+    return data;
+  } catch (err) {
+    console.error("[Widget] Error sending message (fetch threw):", err);
+    return { error: err.message || "Network error" };
+  }
+}
+
   // Render a series of listing cards under the bot message.
   // listings: [{ title, imageUrl, price, detailsUrl }]
   function displayListings(listings, chatContainer) {
@@ -227,26 +194,63 @@ const RealtorWidget = (() => {
 
   // Process API response (Prompt 3)
   async function processApiResponse(apiResponse, chatContainer) {
-    let content = apiResponse.data || apiResponse.response;
-    let structured = {};
-    try {
-      structured = typeof content === "string" ? JSON.parse(content) : (content || {});
-    } catch (e) {
-      console.error("Failed to parse API response", e);
-      structured = {};
-    }
-    const messages = Array.isArray(structured.messages) ? structured.messages : [structured.message || structured.text || ""];
-    for (const message of messages) {
-      const el = createElement("div", { class: "widget-message assistant" }, message);
-      chatContainer.appendChild(el);
-      scrollChatToBottom(chatContainer);
-      await new Promise(r => setTimeout(r, 500));
-    }
-    if (structured.action === "showListings" && Array.isArray(structured.listings)) {
-      // Use helper to show multiple listings returned by the n8n workflow
-      displayListings(structured.listings, chatContainer);
+  console.log("[Widget] processApiResponse called with:", apiResponse, "chatContainer:", chatContainer);
+  if (!chatContainer) {
+    console.warn("[Widget] processApiResponse: chatContainer is null/undefined");
+    return;
+  }
+
+  // Handle error field first
+  if (apiResponse.error) {
+    console.log("[Widget] processApiResponse: error field detected:", apiResponse.error);
+    const errorEl = createElement('div', { class: 'widget-message assistant error' }, apiResponse.error);
+    chatContainer.appendChild(errorEl);
+    scrollChatToBottom(chatContainer);
+    return;
+  }
+
+  // Determine replyText, falling back to older fields if needed
+  const replyText = apiResponse.replyText 
+                    || apiResponse.response 
+                    || apiResponse.message 
+                    || apiResponse.text 
+                    || "";
+  console.log("[Widget] processApiResponse: determined replyText:", replyText);
+
+  if (replyText) {
+    const messageEl = createElement('div', { class: 'widget-message assistant' }, replyText);
+    console.log("[Widget] processApiResponse: appending assistant message:", replyText);
+    chatContainer.appendChild(messageEl);
+    scrollChatToBottom(chatContainer);
+    // optional delay removed for simplicity; if you want delay:
+    // await new Promise(r => setTimeout(r, 500));
+  } else {
+    console.log("[Widget] processApiResponse: no replyText found, skipping message append");
+  }
+
+  // Handle action and data
+  const action = apiResponse.action;
+  const data = apiResponse.data || {};
+  console.log("[Widget] processApiResponse: action:", action, "data:", data);
+
+  if (action === 'showSlots' && Array.isArray(data.slots)) {
+    console.log("[Widget] processApiResponse: calling showBookingOptions with slots:", data.slots);
+    showBookingOptions(data.slots);
+  } else if (action === 'bookingConfirmed' && data.bookingInfo) {
+    console.log("[Widget] processApiResponse: calling showBookingConfirmation with info:", data.bookingInfo);
+    showBookingConfirmation(data.bookingInfo);
+  } else if (action === 'showListings' && Array.isArray(data.listings)) {
+    console.log("[Widget] processApiResponse: calling displayListings with listings:", data.listings);
+    displayListings(data.listings, chatContainer);
+  } else {
+    if (action) {
+      console.log("[Widget] processApiResponse: unrecognized or no-op action:", action);
     }
   }
+
+  scrollChatToBottom(chatContainer);
+}
+
 
   // Initialize chat functionality.
   async function init(options = {}) {
