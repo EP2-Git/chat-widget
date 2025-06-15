@@ -33,6 +33,21 @@ const RealtorWidget = (() => {
   // conversational flows.
   function getConversationId() {
     const key = 'ListingPilotConversationId';
+    const testingMode = window?.ListingPilotConfig?.testingMode;
+
+    // In testing mode we skip persistence entirely so each page load starts
+    // with a fresh ID. We also clear any saved ID in localStorage to avoid
+    // confusion when switching between modes.
+    if (testingMode) {
+      try {
+        window.localStorage?.removeItem(key);
+      } catch (err) {
+        // ignore storage errors in testing mode
+      }
+      if (!memoryConversationId) memoryConversationId = generateUUID();
+      return memoryConversationId;
+    }
+
     try {
       if (window.localStorage) {
         let id = localStorage.getItem(key);

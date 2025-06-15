@@ -49,6 +49,7 @@ You need an HTTP endpoint that implements your chat logic (for example using [n8
 - `historyEndpoint` – optional endpoint for past conversation (if supported)
 - `agentName` – displayed in the header
 - `primaryColor` and `accentColor` – override theme colors
+- `testingMode` – if `true`, a new conversation ID is created on each page reload
 
 ## CORS Requirements
 
