@@ -10,5 +10,5 @@ window.ListingPilotConfig = {
   primaryColor: "#2c3e50",
   accentColor: "#16a085",
   historyEndpoint: "https://example.com/history", // optional
-  testingMode: false
+  testingMode: true
 };
