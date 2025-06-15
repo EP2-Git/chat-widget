@@ -102,35 +102,6 @@ const RealtorWidget = (() => {
     if (chatContainer) chatContainer.scrollTop = chatContainer.scrollHeight;
   }
 
-  // Display a list of property listings in the chat.
-  function displayListings(listings) {
-    const chatContainer = document.getElementById('chat-container');
-    const listingsContainer = createElement('div', { class: 'listings-container' });
-
-    listings.forEach(listing => {
-      const formatted = {
-        Price: listing.Price || 'Price not available',
-        Beds: listing.Beds || 'N/A',
-        Baths: listing.Baths || 'N/A',
-        Sqft: listing.Sqft || 'N/A',
-        Description: listing.Description || '',
-        URL: listing.URL || '#'
-      };
-
-      const card = createElement('div', { class: 'listing-card' });
-      card.innerHTML = `
-        <div class="listing-title">${formatted.Price}</div>
-        <div class="listing-detail">Beds: ${formatted.Beds}</div>
-        <div class="listing-detail">Baths: ${formatted.Baths}</div>
-        <div class="listing-detail">Size: ${formatted.Sqft}</div>
-        ${formatted.Description ? `<div class="listing-description">${formatted.Description}</div>` : ''}
-        <a href="${formatted.URL}" class="listing-link" target="_blank">View Property</a>
-      `;
-      listingsContainer.appendChild(card);
-    });
-
-    chatContainer.appendChild(listingsContainer);
-  }
 
   // Placeholder for showing available booking slots.
   function showBookingOptions(slots) {
@@ -144,37 +115,6 @@ const RealtorWidget = (() => {
     // TODO: implement UI for booking confirmation
   }
 
-  // Process API responses in a backend-agnostic way.
-  // This decouples the widget from any specific response schema so
-  // the n8n workflow can drive UI behavior via "action" and "data".
-  function processApiResponse(apiResponse, chatContainer) {
-    if (!chatContainer) return;
-
-    if (apiResponse.error) {
-      const errorEl = createElement('div', { class: 'widget-message assistant error' }, apiResponse.error);
-      chatContainer.appendChild(errorEl);
-      scrollChatToBottom(chatContainer);
-      return;
-    }
-
-    const replyText = apiResponse.replyText || apiResponse.response || apiResponse.message || '';
-    if (replyText) {
-      const messageEl = createElement('div', { class: 'widget-message assistant' }, replyText);
-      chatContainer.appendChild(messageEl);
-    }
-
-    const action = apiResponse.action;
-    const data = apiResponse.data || {};
-    if (action === 'showSlots' && Array.isArray(data.slots)) {
-      showBookingOptions(data.slots);
-    } else if (action === 'bookingConfirmed' && data.bookingInfo) {
-      showBookingConfirmation(data.bookingInfo);
-    } else if (action === 'showListings' && Array.isArray(data.listings)) {
-      displayListings(data.listings);
-    }
-
-    scrollChatToBottom(chatContainer);
-  }
 
   async function sendMessageToAPI(message) {
   const webhookUrl = getWebhookUrl();
