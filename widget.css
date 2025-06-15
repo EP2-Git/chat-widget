@@ -186,6 +186,7 @@ body, #realtor-widget-container, #realtor-widget-container * {
   border-radius: 18px;
   max-width: 85%;
   margin: 4px 0;
+  white-space: pre-line;
   opacity: 0;
   transform: translateY(20px) scale(0.95);
   animation: messageIn 0.4s cubic-bezier(0.215, 0.61, 0.355, 1) forwards;
