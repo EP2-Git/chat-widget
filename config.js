@@ -5,7 +5,7 @@
   // logoUrl: "https://example.com/logo.png"
 
 window.ListingPilotConfig = {
-  webhookUrl: "https://pattencodesolutions.app.n8n.cloud/webhook-test/ab2bef70-1a88-4472-acd2-f805586f15fd",
+  webhookUrl: "https://pattencodesolutions.app.n8n.cloud/webhook/ab2bef70-1a88-4472-acd2-f805586f15fd",
   agentName: "Realtor Assistant",
   primaryColor: "#2c3e50",
   accentColor: "#16a085",
