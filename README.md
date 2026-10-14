@@ -63,9 +63,12 @@ Access-Control-Allow-Methods: POST, OPTIONS
 
 ## Testing
 
+- **Offline regression suite**: run `node --test widget.test.js`. It uses a synthetic DOM and mocked webhook replies; it does not contact the configured webhook.
 - **Dummy webhook test**: return `{ "response": "Hello!" }` to confirm basic chat.
 - **Listing rendering test**: reply `{ "response": { "messages": ["Here are some listings"], "listings": [{"Price": "$300k", "Beds": 3, "Baths": 2, "Sqft": 1500, "URL": "#"}] } }` and verify cards render.
 - **Error handling test**: shut down your webhook or return an error to see the widget display the failure message.
+
+The widget also accepts the earlier `{ "replyText": "...", "action": "showListings", "data": { "listings": [...] } }` format. Listing links and images must use HTTP(S) URLs; placeholder `#` and other schemes are not rendered as links. The example `https://example.com/webhook` is intentionally rejected until replaced with a real endpoint.
 
 ## Customization
 
