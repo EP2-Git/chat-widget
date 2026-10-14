@@ -87,7 +87,7 @@ class Element {
   }
 }
 
-function makeWidget({ webhookUrl = 'https://example.test/chat', payload, status = 200, emptyContainer = false, rawText } = {}) {
+function makeWidget({ webhookUrl = 'https://example.test/chat', payload, status = 200, emptyContainer = false, rawText, logoUrl } = {}) {
   const document = {
     htmlWrites: [],
     createElement(tag) { return new Element(tag, this); },
@@ -116,7 +116,7 @@ function makeWidget({ webhookUrl = 'https://example.test/chat', payload, status 
 
   const calls = [];
   const window = {
-    ListingPilotConfig: { webhookUrl, testingMode: true },
+    ListingPilotConfig: { webhookUrl, testingMode: true, logoUrl },
     location: { href: 'https://example.test/page' },
     crypto: { randomUUID: () => 'test-session-id' }
   };
@@ -207,12 +207,13 @@ test('simple response and legacy showListings response remain supported', async 
 });
 
 test('an empty embed container builds usable controls and handles plain-text replies', async () => {
-  const fixture = makeWidget({ emptyContainer: true, rawText: 'Plain text reply' });
+  const fixture = makeWidget({ emptyContainer: true, rawText: 'Plain text reply', logoUrl: 'https://example.test/customer-logo.png' });
   await fixture.widget.init();
   const input = fixture.document.getElementById('chat-input');
   const form = fixture.document.getElementById('chat-form');
   const chat = fixture.document.getElementById('chat-container');
   assert.ok(fixture.document.querySelector('.widget-header'));
+  assert.equal(fixture.document.querySelector('.widget-logo').getAttribute('src'), 'https://example.test/customer-logo.png');
   input.value = 'Hello';
   await form.listeners.submit({ preventDefault() {} });
   assert.match(chat.textContent, /Plain text reply/);

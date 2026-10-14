@@ -271,7 +271,7 @@ const RealtorWidget = (() => {
 
     const toggle = createElement('input', { id: 'widget-toggle', type: 'checkbox' });
     const header = createElement('label', { for: 'widget-toggle', class: 'widget-header' });
-    const logoUrl = safeHttpUrl(config.branding?.logo ?? window.ListingPilotConfig?.logoUrl);
+    const logoUrl = safeHttpUrl(window.ListingPilotConfig?.logoUrl ?? config.branding?.logo);
     if (logoUrl) header.appendChild(createElement('img', { class: 'widget-logo', src: logoUrl, alt: '' }));
     header.appendChild(createElement('span', { class: 'widget-title' },
       displayText(config.branding?.agentName ?? window.ListingPilotConfig?.agentName) || 'Realtor Assistant'));
